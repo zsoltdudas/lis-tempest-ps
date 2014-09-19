@@ -49,7 +49,7 @@ This setup script, that will run before the VM is booted, will Add VHDx Hard Dri
                          Valid VHD types are:
                              Dynamic
                              Fixed
-                    
+
     The following are some examples
 
         SCSI=0,0,Dynamic,4096 : Add a hard drive on SCSI controller 0, Lun 0, vhd type of Dynamic disk with logical sector size of 4096
@@ -65,10 +65,10 @@ This setup script, that will run before the VM is booted, will Add VHDx Hard Dri
     Test data for this test case
 
 .Example
-    attach-vhdx.ps1 -vmName myVM -hvServer localhost -testParams "SCSI=0,0,Dynamic,4096;" 
+    attach-vhdx.ps1 -vmName myVM -hvServer localhost -testParams "SCSI=0,0,Dynamic,4096;"
 
 #>
-param([string] $vmName, [string] $hvServer, [string] $testParams)
+param([string] $vmName, [string] $hvServer, [string] $controllerType, [int] $controllerId, [int] $lun, [string] $vhdType, [int] $sectorSize, [string] $diskType)
 
 $global:MinDiskSize = 1GB
 $global:DefaultDynamicSize = 127GB
@@ -85,20 +85,20 @@ $global:DefaultDynamicSize = 127GB
 function GetRemoteFileInfo([String] $filename, [String] $server )
 {
     $fileInfo = $null
-    
+
     if (-not $filename)
     {
         return $null
     }
-    
+
     if (-not $server)
     {
         return $null
     }
-    
+
     $remoteFilename = $filename.Replace("\", "\\")
     $fileInfo = Get-WmiObject -query "SELECT * FROM CIM_DataFile WHERE Name='${remoteFilename}'" -computer $server
-    
+
     return $fileInfo
 }
 
@@ -144,12 +144,12 @@ function CreateController([string] $vmName, [string] $server, [string] $controll
 #     If the -SCSI options is false, an IDE drive is created
 ############################################################################
 function CreateHardDrive( [string] $vmName, [string] $server, [System.Boolean] $SCSI, [int] $ControllerID,
-                          [int] $Lun, [string] $vhdType, [string] $sectorSizes)
+                          [int] $Lun, [string] $vhdType, [string] $sectorSizes, [string] $diskType)
 {
     $retVal = $false
 
     Write-Output "INFO: CreateHardDrive $vmName $server $scsi $controllerID $lun $vhdType"
-    
+
     # Make sure it's a valid IDE ControllerID.  For IDE, it must 0 or 1.
     # For SCSI it must be 0, 1, 2, or 3
     $controllerType = "IDE"
@@ -162,7 +162,7 @@ function CreateHardDrive( [string] $vmName, [string] $server, [System.Boolean] $
             Write-Output "ERROR: CreateHardDrive was passed an bad SCSI Controller ID: $ControllerID"
             return $false
         }
-        
+
         # Create the SCSI controller if needed
         $sts = CreateController $vmName $server $controllerID
         if (-not $sts[$sts.Length-1])
@@ -179,7 +179,7 @@ function CreateHardDrive( [string] $vmName, [string] $server, [System.Boolean] $
             return $False
         }
     }
-    
+
     # If the hard drive exists, complain...
     $drive = Get-VMHardDiskDrive -VMName $vmName -ControllerNumber $controllerID -ControllerLocation $Lun -ControllerType $controllerType -ComputerName $server
     if ($drive)
@@ -204,7 +204,7 @@ function CreateHardDrive( [string] $vmName, [string] $server, [System.Boolean] $
             $defaultVhdPath += "\"
         }
 
-	$vhdName = $defaultVhdPath + $vmName + "-" + $controllerType + "-" + $controllerID + "-" + $lun + "-" + $vhdType + ".vhdx" 
+    $vhdName = $defaultVhdPath + $vmName + "-" + $controllerType + "-" + $controllerID + "-" + $lun + "-" + $vhdType  + "." + $diskType.ToLower()
 
 
         $fileInfo = GetRemoteFileInfo -filename $vhdName -server $server
@@ -230,7 +230,7 @@ function CreateHardDrive( [string] $vmName, [string] $server, [System.Boolean] $
         Write-Output "INFO: Success"
         $retVal = $True
     }
-    
+
     return $retVal
 }
 
@@ -252,98 +252,27 @@ if ($hvServer -eq $null -or $hvServer.Length -eq 0)
     return $False
 }
 
-if ($testParams -eq $null -or $testParams.Length -lt 3)
+$SCSI = $false
+if ($controllerType -eq "SCSI")
 {
-    Write-Output "ERROR: No testParams provided; Script requires test params"
-    return $False
+    $SCSI = $true
 }
 
-# Parse the testParams string
-$params = $testParams.Split(';')
-foreach ($p in $params)
+if (@("Fixed", "Dynamic", "PassThrough") -notcontains $vhdType)
 {
-    if ($p.Trim().Length -eq 0)
-    {
-        continue
-    }
+    Write-Output "ERROR: Unknown disk type: $vhdType"
+    $retVal = $false
+    continue
+}
 
-    $temp = $p.Trim().Split('=')
-    
-    if ($temp.Length -ne 2)
-    {
-	Write-Output "WARN: Test parameter '$p' is being ignored because it appears to be malformed"
-	continue
-    }
-    
-    $controllerType = $temp[0].Trim()
-    if (@("IDE", "SCSI") -notcontains $controllerType)
-    {
-        # Not a test parameter we are concerned with
-        continue
-    }
-    
-    $SCSI = $false
-    if ($controllerType -eq "SCSI")
-    {
-        $SCSI = $true
-    }
-        
-    $diskArgs = $temp[1].Trim().Split(',')
-    
-    if ($diskArgs.Length -lt 3 -or $diskArgs.Length -gt 4)
-    {
-        Write-Output "ERROR: Incorrect number of arguments: $p"
-        $retVal = $false
-        continue
-    }
-    
-    $controllerID = $diskArgs[0].Trim()
-    $lun = $diskArgs[1].Trim()
-    $vhdType = $diskArgs[2].Trim()
-
-    $sectorSize = 512
-    if ($diskArgs.Length -eq 4)
-    {
-        $sectorSize = $diskArgs[3].Trim()
-        if ($sectorSize -ne "4096" -and $sectorSize -ne "512")
-        {
-            Write-Output "ERROR: bad sector size: ${sectorSize}"
-            return $False
-        }
-    }
-
-    if (@("Fixed", "Dynamic", "PassThrough") -notcontains $vhdType)
-    {
-        Write-Output "ERROR: Unknown disk type: $p"
-        $retVal = $false
-        continue
-    }
-    
-    if ($vhdType -eq "PassThrough")
-    {
-        Write-Output "CreatePassThruDrive $vmName $hvServer $scsi $controllerID $Lun"
-        $sts = CreatePassThruDrive $vmName $hvServer -SCSI:$scsi $controllerID $Lun
-        $results = [array]$sts
-        if (-not $results[$results.Length-1])
-        {
-            Write-Output "ERROR: Failed to create PassThrough drive"
-            $sts
-            $retVal = $false
-            continue
-        }
-    }
-    else # Must be Fixed or Dynamic
-    {
-        Write-Output "CreateHardDrive $vmName $hvServer $scsi $controllerID $Lun $vhdType $sectorSize"
-        $sts = CreateHardDrive -vmName $vmName -server $hvServer -SCSI:$SCSI -ControllerID $controllerID -Lun $Lun -vhdType $vhdType -sectorSize $sectorSize
-        if (-not $sts[$sts.Length-1])
-        {
-            write-output "ERROR: Failed to create hard drive"
-            $sts
-            $retVal = $false
-            continue
-        }
-    }
+Write-Output "CreateHardDrive $vmName $hvServer $diskType $scsi $controllerID $Lun $vhdType $sectorSize"
+$sts = CreateHardDrive -vmName $vmName -server $hvServer -SCSI:$SCSI -ControllerID $controllerID -Lun $Lun -vhdType $vhdType -sectorSize $sectorSize -diskType $diskType
+if (-not $sts[$sts.Length-1])
+{
+    write-output "ERROR: Failed to create hard drive"
+    $sts
+    $retVal = $false
+    continue
 }
 
 return $retVal
