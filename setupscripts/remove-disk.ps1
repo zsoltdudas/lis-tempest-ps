@@ -21,11 +21,11 @@ param([string] $vmName=$(throw “No input”), [string] $hvServer=$(throw “No input
 # Main entry point for script
 #
 ############################################################################
-$vm = Get-VM $vmName
+$vm = Get-VM $vmName -ErrorAction SilentlyContinue
 if($vm)
 {
     Stop-VM -vmName $vmName -force
-}
+}n
 $vhdxName = $diskName
 
   $hostInfo = Get-VMHost -ComputerName $hvServer

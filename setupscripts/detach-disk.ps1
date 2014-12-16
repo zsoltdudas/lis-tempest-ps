@@ -22,7 +22,7 @@ param([string] $vmName=$(throw “No input”), [string] $hvServer=$(throw “No input
 
 $vhdxName = $diskName
 $vhdxDisks = Get-VMHardDiskDrive -Verbose -VMName $vmName
-if ($? -ne 0)
+if (!$vhdxDisks)
 {
 	"Error: Get-VMHardDiskDrive failed. "
 	exit -1
@@ -34,9 +34,12 @@ foreach ($vhdx in $vhdxDisks)
 	if ($vhdxPath -match $vhdxName)
 	{
 		"Info : Removing drive ${vhdxName}"
-		Remove-VMHardDiskDrive -Verbose -vmName $vmName -ControllerType $vhdx.controllerType -ControllerNumber $vhdx.controllerNumber -ControllerLocation $vhdx.ControllerLocation -ComputerName $hvServer
-		if ($? -ne 0)
-		{
+        $vhdx.ControllerLocation
+        $error.Clear()
+        $sts = Remove-VMHardDiskDrive -Verbose -vmName $vmName -ControllerType $vhdx.controllerType -ControllerNumber $vhdx.controllerNumber -ControllerLocation $vhdx.ControllerLocation -ComputerName $hvServer
+        if ($error.Count -gt 0)
+        {    
+            $error
 			"Error: Remove-VMHardDiskDrive failed. "
 			exit -1
 		}
