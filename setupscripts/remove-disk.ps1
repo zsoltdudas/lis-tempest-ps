@@ -25,7 +25,7 @@ $vm = Get-VM $vmName -ErrorAction SilentlyContinue
 if($vm)
 {
     Stop-VM -vmName $vmName -force
-}n
+}
 $vhdxName = $diskName
 
   $hostInfo = Get-VMHost -ComputerName $hvServer
@@ -43,9 +43,13 @@ $vhdxName = $diskName
 
 Get-ChildItem $defaultVhdPath -Filter $vhdxName | `
 Foreach-Object{
-	
+
     $error.Clear()
 	"Info: Deleting vhdx file ${vhdxName}"
+    if($_.FullName.Contains( 'PassThrough'))
+    {
+        $_ | Dismount-VHD
+    }
 	Remove-Item -Path $_.FullName
 	if ($error.Count -gt 0)
 	{

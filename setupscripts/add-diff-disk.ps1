@@ -32,7 +32,7 @@ function GetRemoteFileInfo([String] $filename, [String] $server )
     $fileInfo = $null
     $remoteFilename = $filename.Replace("\", "\\")
     $fileInfo = Get-WmiObject -query "SELECT * FROM CIM_DataFile WHERE Name='${remoteFilename}'" -computer $server
-    
+
     return $fileInfo
 }
 
@@ -135,7 +135,7 @@ if ($SCSI)
         "Error: CreateHardDrive was passed a bad SCSI Controller ID: $controllerId"
         return $false
     }
-        
+
     #
     # Create the SCSI controller if needed
     #
@@ -155,7 +155,7 @@ else # Make sure the controller ID is valid for IDE
     }
 }
 
-$drives = Get-VMHardDiskDrive -VMName $vmName -ComputerName $hvServer -ControllerType $controllerType -ControllerNumber $controllerId -ControllerLocation $lun 
+$drives = Get-VMHardDiskDrive -VMName $vmName -ComputerName $hvServer -ControllerType $controllerType -ControllerNumber $controllerId -ControllerLocation $lun
 if ($drives)
 {
     "Error: drive $controllerType $controllerId $Lun already exists"
@@ -178,12 +178,12 @@ if (-not $defaultVhdPath.EndsWith("\"))
 
 if ($parentVhd.EndsWith(".vhd"))
 {
-    # To Make sure we do not use exisiting  Diff disk , del if exisit 
-    $vhdName = $defaultVhdPath + ${vmName} +"-" + ${controllerType} + "-" + ${controllerId}+ "-" + ${lun} + "-" + "Diff.vhd"  
+    # To Make sure we do not use exisiting  Diff disk , del if exisit
+    $vhdName = $defaultVhdPath + ${vmName} +"-" + ${controllerType} + "-" + ${controllerId}+ "-" + ${lun} + "-" + "Diff.vhd"
 }
 else
 {
-    $vhdName = $defaultVhdPath + ${vmName} +"-" + ${controllerType} + "-" + ${controllerId}+ "-" + ${lun} + "-" + "Diff.vhdx"  
+    $vhdName = $defaultVhdPath + ${vmName} +"-" + ${controllerType} + "-" + ${controllerId}+ "-" + ${lun} + "-" + "Diff.vhdx"
 }
 
 $vhdFileInfo = GetRemoteFileInfo  $vhdName  $hvServer
@@ -215,7 +215,7 @@ if (-not $parentFileInfo)
 
 #
 # Create the .vhd file
-$newVhd = New-Vhd -Path $vhdName  -ParentPath $parentVhdFilename  -ComputerName $hvServer -Differencing          
+$newVhd = New-Vhd -Path $vhdName  -ParentPath $parentVhdFilename  -ComputerName $hvServer -Differencing
 if (-not $newVhd)
 {
     "Error: unable to create a new .vhd file"
@@ -234,7 +234,7 @@ if ($newVhd.ParentPath -ne $parentVhdFilename)
 # Attach the .vhd file to the new drive
 #
 $error.Clear()
-$disk = Add-VMHardDiskDrive -VMName $vmName -ComputerName $hvServer -ControllerType $controllerType -ControllerNumber $controllerId -ControllerLocation $lun -Path $vhdName    
+$disk = Add-VMHardDiskDrive -VMName $vmName -ComputerName $hvServer -ControllerType $controllerType -ControllerNumber $controllerId -ControllerLocation $lun -Path $vhdName
 if ($error.Count -gt 0)
 {
     "Error: Add-VMHardDiskDrive failed to add drive on ${controllerType} ${controllerId} ${Lun}s"

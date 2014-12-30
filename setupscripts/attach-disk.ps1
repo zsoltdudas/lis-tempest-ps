@@ -138,34 +138,32 @@ function CreateHardDrive( [string] $vmName, [string] $server, [System.Boolean] $
 
         $vhdName = $defaultVhdPath + $vmName + "-" + $controllerType + "-" + $controllerID + "-" + $lun + "-" + $vhdType  + "." + $diskType.ToLower()
 
-
-        $fileInfo = GetRemoteFileInfo -filename $vhdName -server $server
-
-
-        if (-not $fileInfo)
+        if(Test-Path $vhdName)
         {
-            $newVhd = $null
-            switch ($vhdType)
-            {
-                "Dynamic"
-                    {
-                        $newvhd = New-VHD -Path $vhdName  -size $global:MinDiskSize -ComputerName $server -Dynamic -LogicalSectorSize ([int] $sectorSize)
-                    }
-                "Fixed"
-                    {
-                        $newVhd = New-VHD -Path $vhdName -size $global:MinDiskSize -ComputerName $server -Fixed
-                    }
-                default
-                    {
-                        Write-Output "Error: unknow vhd type of ${vhdType}"
-                        exit -1
-                    }
-            }
-            if ($newVhd -eq $null)
-            {
-                write-output "Error: New-VHD failed to create the new .vhd file: $($vhdName)"
-                exit -1
-            }
+            Remove-Item $vhdName
+        }
+
+        $newVhd = $null
+        switch ($vhdType)
+        {
+            "Dynamic"
+                {
+                    $newvhd = New-VHD -Path $vhdName  -size $global:MinDiskSize -ComputerName $server -Dynamic -LogicalSectorSize ([int] $sectorSize)
+                }
+            "Fixed"
+                {
+                    $newVhd = New-VHD -Path $vhdName -size $global:MinDiskSize -ComputerName $server -Fixed
+                }
+            default
+                {
+                    Write-Output "Error: unknow vhd type of ${vhdType}"
+                    exit -1
+                }
+        }
+        if ($newVhd -eq $null)
+        {
+            write-output "Error: New-VHD failed to create the new .vhd file: $($vhdName)"
+            exit -1
         }
 
         $ERROR.Clear()
