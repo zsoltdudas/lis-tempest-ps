@@ -38,13 +38,13 @@ foreach ($vhdx in $vhdxDisks)
         $error.Clear()
         $sts = Remove-VMHardDiskDrive -Verbose -vmName $vmName -ControllerType $vhdx.controllerType -ControllerNumber $vhdx.controllerNumber -ControllerLocation $vhdx.ControllerLocation -ComputerName $hvServer
         if ($error.Count -gt 0)
-        {    
+        {
             $error
 			"Error: Remove-VMHardDiskDrive failed. "
 			exit -1
 		}
-        else 
-        { 
+        else
+        {
           "Successfully detached $vhdxPath"
         }
 	}

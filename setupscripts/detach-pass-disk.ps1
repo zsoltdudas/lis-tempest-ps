@@ -1,4 +1,4 @@
-# Copyright 2014 Cloudbase Solutions Srl
+Ôªø# Copyright 2014 Cloudbase Solutions Srl
 #
 #    Licensed under the Apache License, Version 2.0 (the "License"); you may
 #    not use this file except in compliance with the License. You may obtain
@@ -14,19 +14,13 @@
 
 ############################################################################
 
-param([string] $vmName=$(throw ìNo inputî), [string] $hvServer=$(throw ìNo inputî), [string] $diskName=$(throw ìNo inputî))
+param([string] $hvServer=$(throw ‚ÄúNo input‚Äù), [string] $diskName=$(throw ‚ÄúNo input‚Äù))
 
 ############################################################################
 #
 # Main entry point for script
 #
 ############################################################################
-$vm = Get-VM $vmName -ErrorAction SilentlyContinue
-if($vm)
-{
-    Stop-VM -vmName $vmName -force
-}
-$vhdxName = $diskName
 
   $hostInfo = Get-VMHost -ComputerName $hvServer
     if (-not $hostInfo)
@@ -41,22 +35,17 @@ $vhdxName = $diskName
         $defaultVhdPath += "\"
     }
 
-Get-ChildItem $defaultVhdPath -Filter $vhdxName | `
+Get-ChildItem $defaultVhdPath -Filter $diskName | `
 Foreach-Object{
 
-	"Info: Deleting vhdx file ${vhdxName}"
-    if($_.FullName.Contains( 'PassThrough'))
-    {
-        $_ | Dismount-VHD -ErrorAction Ignore
-    }
-
     $error.Clear()
-	Remove-Item -Path $_.FullName
-	if ($error.Count -gt 0)
+	"Info: Detaching vhdx file ${diskName}"
+     $_ | Dismount-VHD
+    if ($error.Count -gt 0)
 	{
 		"Error: Failed to delete VHDx File "
 		$error[0].Exception
 		exit -1
 	}
 }
-"Successfully deleted ${vhdxName}"
+"Successfully detached ${diskName}"

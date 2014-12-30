@@ -16,44 +16,77 @@ param([string] $vmName=$(throw “No input”), [string] $hvServer=$(throw “No
 
 $global:MinDiskSize = 1GB
 
-# GetRemoteFileInfo()
+# CreateController
 #
-# Description:
-#     Use WMI to retrieve file information for a file residing on the
-#     Hyper-V server.
-#
-# Return:
-#     A FileInfo structure if the file exists, null otherwise.
-#######################################################################
-function GetRemoteFileInfo([String] $filename, [String] $server )
+# Description
+#     Create a SCSI controller if one with the ControllerID does not
+#     already exist.
+############################################################################
+function CreateController([string] $vmName, [string] $server, [string] $controllerID)
 {
-    $fileInfo = $null
+    # Initially, we will limit this to 4 SCSI controllers...
+    if ($ControllerID -lt 0 -or $controllerID -gt 3)
+    {
+        write-output "ERROR: bad SCSI controller ID: $controllerID"
+        exit -1
+    }
 
-    $remoteFilename = $filename.Replace("\", "\\")
-    $fileInfo = Get-WmiObject -query "SELECT * FROM CIM_DataFile WHERE Name='${remoteFilename}'" -computer $server
-
-    return $fileInfo
+    # Check if the controller already exists.
+    $scsiCtrl = Get-VMScsiController -VMName $vmName -ComputerName $server
+    if ($scsiCtrl.Length -1 -ge $controllerID)
+    {
+        Write-Output "INFO: SCI ontroller already exists"
+    }
+    else
+    {
+        $ERROR.Clear()
+        Add-VMScsiController -VMName $vmName -ComputerName $server
+        if ($ERROR.Count -gt 0)
+        {
+            Write-Output "ERROR: Add-VMScsiController failed to add 'SCSI Controller $ControllerID'"
+            $ERROR[0].Exception
+            exit -1
+        }
+        Write-Output "INFO: Controller successfully added"
+    }
+    return $True
 }
-
-
 # CreateHardDrive
 #
 # Description
 #     Create an IDE drive is created
 ############################################################################
-function CreateHardDrive( [string] $vmName, [string] $server, [int] $ControllerID, [int] $Lun, [string] $vhdType)
+function CreateHardDrive( [string] $vmName, [string] $server, [int] $ControllerID, [int] $Lun, [string] $vhdType, [string] $controllerType)
 {
     Write-Output "INFO: CreateHardDrive $vmName $server $controllerID $lun"
 
     # Make sure it's a valid IDE ControllerID.  For IDE, it must 0 or 1.
     # For SCSI it must be 0, 1, 2, or 3
-    $controllerType = "IDE"
-    if ($ControllerID -lt 0 -or $ControllerID -gt 1)
+    if ($controllerType -eq "SCSI")
     {
-        Write-Output "ERROR: CreateHardDrive was passed an invalid IDE Controller ID: $ControllerID"
-        exit -1
-    }
 
+        if ($ControllerID -lt 0 -or $ControllerID -gt 3)
+        {
+            Write-Output "ERROR: CreateHardDrive was passed an bad SCSI Controller ID: $ControllerID"
+            exit -1
+        }
+
+        # Create the SCSI controller if needed
+        $sts = CreateController $vmName $server $controllerID
+        if (-not $sts[$sts.Length-1])
+        {
+            Write-Output "ERROR: Unable to create SCSI controller $controllerID"
+            exit -1
+        }
+    }
+    else
+    {
+        if ($ControllerID -lt 0 -or $ControllerID -gt 1)
+        {
+            Write-Output "ERROR: CreateHardDrive was passed an invalid IDE Controller ID: $ControllerID"
+            exit -1
+        }
+    }
     # If the hard drive exists, complain...
     $drive = Get-VMHardDiskDrive -VMName $vmName -ControllerNumber $controllerID -ControllerLocation $Lun -ControllerType $controllerType -ComputerName $server
     if ($drive)
@@ -110,12 +143,6 @@ function CreateHardDrive( [string] $vmName, [string] $server, [int] $ControllerI
 # Main entry point for script
 ############################################################################
 
-$SCSI = $false
-if ($controllerType -eq "SCSI")
-{
-    $SCSI = $true
-}
-
 if ( "PassThrough" -ne $vhdType)
 {
     Write-Output "ERROR: Unknown disk type: $vhdType"
@@ -123,8 +150,7 @@ if ( "PassThrough" -ne $vhdType)
 }
 
 Write-Output "CreateHardDrive $vmName $hvServer $controllerID $Lun $vhdType"
-Write-Output $vhdType
-$sts = CreateHardDrive -vmName $vmName -server $hvServer -ControllerID $controllerID -Lun $Lun -vhdType $vhdType
+$sts = CreateHardDrive -vmName $vmName -server $hvServer -ControllerID $controllerID -Lun $Lun -vhdType $vhdType -controllerType $controllerType
 if (-not $sts[$sts.Length-1])
 {
     write-output "ERROR: Failed to create hard drive"
