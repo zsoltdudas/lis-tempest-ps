@@ -12,7 +12,7 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-param([string] $vmName=$(throw “No input”), [string] $hvServer=$(throw “No input”), [string] $controllerType=$(throw “No input”), [int] $controllerId=$(throw “No input”), [int] $lun=$(throw “No input”), [string] $vhdType=$(throw “No input”),[int] $sectorSize=$(throw “No input”), [string] $diskType=$(throw “No input”))
+param([string] $vmName=$(throw “No input”), [string] $hvServer=$(throw “No input”), [string] $controllerType=$(throw “No input”), [int] $controllerId=$(throw “No input”), [int] $lun=$(throw “No input”), [string] $vhdType=$(throw “No input”),[int] $sectorSize=$(throw “No input”), [string] $diskType=$(throw “No input”), [string] $diskSize)
 
 $global:MinDiskSize = 1GB
 $global:DefaultDynamicSize = 127GB
@@ -71,6 +71,45 @@ function CreateController([string] $vmName, [string] $server, [string] $controll
     }
     return $True
 }
+function ConvertStringToUInt64([string] $size)
+{
+    $uint64Size = $null
+
+
+    #
+    # Make sure we received a string to convert
+    #
+    if (-not $size)
+    {
+        Write-Error -Message "ConvertStringToUInt64() - input string is null" -Category InvalidArgument -ErrorAction SilentlyContinue
+        return $null
+    }
+
+
+    if ($size.EndsWith("MB"))
+    {
+        $num = $size.Replace("MB","")
+        $uint64Size = ([Convert]::ToUInt64($num)) * 1MB
+    }
+    elseif ($size.EndsWith("GB"))
+    {
+        $num = $size.Replace("GB","")
+        $uint64Size = ([Convert]::ToUInt64($num)) * 1GB
+    }
+    elseif ($size.EndsWith("TB"))
+    {
+        $num = $size.Replace("TB","")
+        $uint64Size = ([Convert]::ToUInt64($num)) * 1TB
+    }
+    else
+    {
+        Write-Error -Message "Invalid newSize parameter: ${size}" -Category InvalidArgument -ErrorAction SilentlyContinue
+        return $null
+    }
+
+
+    return $uint64Size
+}
 
 # CreateHardDrive
 #
@@ -78,7 +117,7 @@ function CreateController([string] $vmName, [string] $server, [string] $controll
 #     If the -SCSI options is false, an IDE drive is created
 ############################################################################
 function CreateHardDrive( [string] $vmName, [string] $server, [System.Boolean] $SCSI, [int] $ControllerID,
-                          [int] $Lun, [string] $vhdType, [string] $sectorSize, [string] $diskType)
+                          [int] $Lun, [string] $vhdType, [string] $sectorSize, [string] $diskType, [string] $diskSize)
 {
     Write-Output "INFO: CreateHardDrive $vmName $server $scsi $controllerID $lun $vhdType"
 
@@ -144,15 +183,23 @@ function CreateHardDrive( [string] $vmName, [string] $server, [System.Boolean] $
         }
 
         $newVhd = $null
+        if ($diskSize -ne $null -and $diskSize.Length -ne 0)
+        {
+            $intDiskSize = ConvertStringToUInt64 $diskSize
+        }
+        else
+        {
+            $intDiskSize = $global:MinDiskSize
+        }
         switch ($vhdType)
         {
             "Dynamic"
                 {
-                    $newvhd = New-VHD -Path $vhdName  -size $global:MinDiskSize -ComputerName $server -Dynamic -LogicalSectorSize ([int] $sectorSize)
+                    $newvhd = New-VHD -Path $vhdName  -size $intDiskSize -ComputerName $server -Dynamic -LogicalSectorSize ([int] $sectorSize)
                 }
             "Fixed"
                 {
-                    $newVhd = New-VHD -Path $vhdName -size $global:MinDiskSize -ComputerName $server -Fixed
+                    $newVhd = New-VHD -Path $vhdName -size $intDiskSize -ComputerName $server -Fixed
                 }
             default
                 {
@@ -197,7 +244,7 @@ if (@("Fixed", "Dynamic", "PassThrough") -notcontains $vhdType)
 
 Write-Output "CreateHardDrive $vmName $hvServer $diskType $scsi $controllerID $Lun $vhdType $sectorSize"
 Write-Output $vhdType
-$sts = CreateHardDrive -vmName $vmName -server $hvServer -SCSI:$SCSI -ControllerID $controllerID -Lun $Lun -vhdType $vhdType -sectorSize $sectorSize -diskType $diskType
+$sts = CreateHardDrive -vmName $vmName -server $hvServer -SCSI:$SCSI -ControllerID $controllerID -Lun $Lun -vhdType $vhdType -sectorSize $sectorSize -diskType $diskType -diskSize $diskSize
 if (-not $sts[$sts.Length-1])
 {
     write-output "ERROR: Failed to create hard drive"
