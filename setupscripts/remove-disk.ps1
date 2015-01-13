@@ -44,7 +44,7 @@ Get-ChildItem $defaultVhdPath -Filter $diskName | `
 Foreach-Object{
 
 	"Info: Deleting vhdx file ${diskName}"
-    if($_.FullName.Contains( 'PassThrough'))
+    if($_.FullName.Contains( 'PassThrough') -or $_.FullName.Contains('backup'))
     {
         $_ | Dismount-VHD -ErrorAction Ignore
     }
