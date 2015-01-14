@@ -18,7 +18,7 @@ param([string] $vmName=$(throw “No input”), [string] $hvServer=$(throw “No
 ############################################################################
 function CreateBackupDrive( [string] $vmName, [string] $server)
 {
-    
+
     # Create the .vhd file if it does not already exist, then create the drive and mount the .vhdx
     $hostInfo = Get-VMHost -ComputerName $server
     if (-not $hostInfo)
@@ -40,14 +40,21 @@ function CreateBackupDrive( [string] $vmName, [string] $server)
         Remove-Item $vhdName
     }
     $newVhd = $null
-    
+
     $ERROR.Clear()
-    $fullSize = 2*1024*1024*1024 #2GB
+    $fullSize = 4*1024*1024*1024 #4GB
     Get-VMHardDiskDrive -ComputerName $server -VMName $vmName | foreach {
     if($_.Path.Contains('vhd'))
     {
         $fullSize += $($_  | Get-VHD ).FileSize
-    } 
+    }
+    }
+
+    if ($ERROR.Count -gt 0)
+    {
+        Write-Output "ERROR: "
+        $ERROR[0].Exception
+        exit -1
     }
     $newVhd = New-VHD -Path $vhdName -size $fullSize -ComputerName $server -Fixed
     if ($newVhd -eq $null)
@@ -55,12 +62,9 @@ function CreateBackupDrive( [string] $vmName, [string] $server)
         write-output "Error: New-VHD failed to create the new .vhd file: $($vhdName)"
         exit -1
     }
-    #$newVhd = $newVhd | Mount-VHD -Passthru
-    #$phys_disk = $newVhd | Initialize-Disk -PartitionStyle MBR -PassThru 
-    #$drive = $phys_disk | New-Partition -AssignDriveLetter -UseMaximumSize | Format-Volume -FileSystem NTFS -NewFileSystemLabel "backup" -Confirm:$false
-     
+
     $newVhd = $newVhd | Mount-VHD -Passthru
-    $phys_disk = $newVhd | Initialize-Disk -PartitionStyle MBR -PassThru       
+    $phys_disk = $newVhd | Initialize-Disk -PartitionStyle MBR -PassThru
     $partition = $phys_disk | New-Partition -AssignDriveLetter -UseMaximumSize
     sleep 1
     $volume = Format-Volume -Partition $partition -FileSystem NTFS -NewFileSystemLabel "backup" -Confirm:$false
