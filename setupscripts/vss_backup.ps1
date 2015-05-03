@@ -30,13 +30,13 @@ if ($targetDrive -eq $null)
     throw "ERROR: Backup target drive is not specified."
 }
 
-# Check if the Vm VHD in not on the same drive as the backup destination 
+# Check if the Vm VHD in not on the same drive as the backup destination
 $vm = Get-VM -Name $vmName -ComputerName $hvServer
 if (-not $vm)
 {
     throw "Error: VM '${vmName}' does not exist"
 }
- 
+
 foreach ($drive in $vm.HardDrives)
 {
     if ( $drive.Path.StartsWith("${targetDrive}"))
@@ -78,15 +78,23 @@ Write-Output "`nBackup policy is: `n$policy"
 
 # Start the backup
 Write-Output "`nBacking to $targetDrive"
-Start-WBBackup -Policy $policy
 
-# Review the results            
+$ERROR.Clear()
+Start-WBBackup -Policy $policy
+if ($ERROR.Count -gt 0)
+{
+    Write-Output "ERROR: "
+    $ERROR[0].Exception
+    exit -1
+}
+# Review the results
 $BackupTime = (New-Timespan -Start (Get-WBJob -Previous 1).StartTime -End (Get-WBJob -Previous 1).EndTime).Minutes
-Write-Output "`nBackup duration: $BackupTime minutes"           
+Write-Output "`nBackup duration: $BackupTime minutes"
 
 $sts=Get-WBJob -Previous 1
-if ($sts.JobState -ne "Completed")
+if ($sts.JobState -ne "Completed" -or $sts.HResult -ne 0)
 {
+    Write-Error $sts.ErrorDescription
     throw "ERROR: VSS WBBackup failed"
 }
 

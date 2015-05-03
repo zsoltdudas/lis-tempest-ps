@@ -12,63 +12,7 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-<#
-.Synopsis
-This setup script, that will run before the VM is booted, will Add VHDx Hard Driver to VM.
-
-.Description
-    This is a setup script that has to be run while the VM is turned off.
-    The script will create a .vhdx file, and mount it to the
-    specified hard drive. If the hard drive does not exist, it
-    will be created.
-
-    The  scripts will always pass the vmName, hvServer, and a
-    string of testParams from the test definition separated by
-    semicolons. The testParams for this script identify disk
-    controllers, hard drives, .vhd type, and sector size.  The
-    testParamss have the format of:
-
-        ControllerType=Controller Index, Lun or Port, vhd type, sector size
-
-    The following are some examples
-
-        SCSI=0,0,Dynamic,4096 : Add SCSI Controller 0, hard drive on Lun 0, .vhd type Dynamic, sector size of 4096
-        SCSI=1,0,Fixed,512    : Add SCSI Controller 1, hard drive on Lun 0, .vhd type Fixed, sector size of 512 bytes
-        IDE=0,1,Dynamic,512   : Add IDE hard drive on IDE 0, port 1, .vhd type Fixed, sector size of 512 bytes
-        IDE=1,1,Fixed,4096    : Add IDE hard drive on IDE 1, port 1, .vhd type Fixed, sector size of 4096 bytes
-
-    All setup and cleanup scripts must return a boolean ($true or $false)
-    to indicate if the script completed successfully.
-
-    Where
-        ControllerType   = The type of disk controller.  IDE or SCSI
-        Controller Index = The index of the controller, 0 based.
-                         Note: IDE can be 0 - 1, SCSI can be 0 - 3
-        Lun or Port      = The IDE port number of SCSI Lun number
-        Vhd Type         = Type of VHD to use.
-                         Valid VHD types are:
-                             Dynamic
-                             Fixed
-
-    The following are some examples
-
-        SCSI=0,0,Dynamic,4096 : Add a hard drive on SCSI controller 0, Lun 0, vhd type of Dynamic disk with logical sector size of 4096
-        IDE=1,1,Fixed,4096  : Add a hard drive on IDE controller 1, IDE port 1, vhd type of Fixed disk with logical sector size of 4096
-
-.Parameter vmName
-    Name of the VM to remove disk from.
-
-.Parameter hvServer
-    Name of the Hyper-V server hosting the VM.
-
-.Parameter testParams
-    Test data for this test case
-
-.Example
-    attach-vhdx.ps1 -vmName myVM -hvServer localhost -testParams "SCSI=0,0,Dynamic,4096;"
-
-#>
-param([string] $vmName, [string] $hvServer, [string] $controllerType, [int] $controllerId, [int] $lun, [string] $vhdType, [int] $sectorSize, [string] $diskType)
+param([string] $vmName=$(throw “No input”), [string] $hvServer=$(throw “No input”), [string] $controllerType=$(throw “No input”), [int] $controllerId=$(throw “No input”), [int] $lun=$(throw “No input”), [string] $vhdType=$(throw “No input”),[int] $sectorSize=$(throw “No input”), [string] $diskType=$(throw “No input”), [string] $diskSize)
 
 $global:MinDiskSize = 1GB
 $global:DefaultDynamicSize = 127GB
@@ -85,16 +29,6 @@ $global:DefaultDynamicSize = 127GB
 function GetRemoteFileInfo([String] $filename, [String] $server )
 {
     $fileInfo = $null
-
-    if (-not $filename)
-    {
-        return $null
-    }
-
-    if (-not $server)
-    {
-        return $null
-    }
 
     $remoteFilename = $filename.Replace("\", "\\")
     $fileInfo = Get-WmiObject -query "SELECT * FROM CIM_DataFile WHERE Name='${remoteFilename}'" -computer $server
@@ -114,7 +48,7 @@ function CreateController([string] $vmName, [string] $server, [string] $controll
     if ($ControllerID -lt 0 -or $controllerID -gt 3)
     {
         write-output "ERROR: bad SCSI controller ID: $controllerID"
-        return $False
+        exit -1
     }
 
     # Check if the controller already exists.
@@ -131,11 +65,50 @@ function CreateController([string] $vmName, [string] $server, [string] $controll
         {
             Write-Output "ERROR: Add-VMScsiController failed to add 'SCSI Controller $ControllerID'"
             $ERROR[0].Exception
-            return $False
+            exit -1
         }
         Write-Output "INFO: Controller successfully added"
     }
     return $True
+}
+function ConvertStringToUInt64([string] $size)
+{
+    $uint64Size = $null
+
+
+    #
+    # Make sure we received a string to convert
+    #
+    if (-not $size)
+    {
+        Write-Error -Message "ConvertStringToUInt64() - input string is null" -Category InvalidArgument -ErrorAction SilentlyContinue
+        return $null
+    }
+
+
+    if ($size.EndsWith("MB"))
+    {
+        $num = $size.Replace("MB","")
+        $uint64Size = ([Convert]::ToUInt64($num)) * 1MB
+    }
+    elseif ($size.EndsWith("GB"))
+    {
+        $num = $size.Replace("GB","")
+        $uint64Size = ([Convert]::ToUInt64($num)) * 1GB
+    }
+    elseif ($size.EndsWith("TB"))
+    {
+        $num = $size.Replace("TB","")
+        $uint64Size = ([Convert]::ToUInt64($num)) * 1TB
+    }
+    else
+    {
+        Write-Error -Message "Invalid newSize parameter: ${size}" -Category InvalidArgument -ErrorAction SilentlyContinue
+        return $null
+    }
+
+
+    return $uint64Size
 }
 
 # CreateHardDrive
@@ -144,10 +117,8 @@ function CreateController([string] $vmName, [string] $server, [string] $controll
 #     If the -SCSI options is false, an IDE drive is created
 ############################################################################
 function CreateHardDrive( [string] $vmName, [string] $server, [System.Boolean] $SCSI, [int] $ControllerID,
-                          [int] $Lun, [string] $vhdType, [string] $sectorSizes, [string] $diskType)
+                          [int] $Lun, [string] $vhdType, [string] $sectorSize, [string] $diskType, [string] $diskSize)
 {
-    $retVal = $false
-
     Write-Output "INFO: CreateHardDrive $vmName $server $scsi $controllerID $lun $vhdType"
 
     # Make sure it's a valid IDE ControllerID.  For IDE, it must 0 or 1.
@@ -160,7 +131,7 @@ function CreateHardDrive( [string] $vmName, [string] $server, [System.Boolean] $
         if ($ControllerID -lt 0 -or $ControllerID -gt 3)
         {
             Write-Output "ERROR: CreateHardDrive was passed an bad SCSI Controller ID: $ControllerID"
-            return $false
+            exit -1
         }
 
         # Create the SCSI controller if needed
@@ -168,7 +139,7 @@ function CreateHardDrive( [string] $vmName, [string] $server, [System.Boolean] $
         if (-not $sts[$sts.Length-1])
         {
             Write-Output "ERROR: Unable to create SCSI controller $controllerID"
-            return $false
+            exit -1
         }
     }
     else # Make sure the controller ID is valid for IDE
@@ -176,7 +147,7 @@ function CreateHardDrive( [string] $vmName, [string] $server, [System.Boolean] $
         if ($ControllerID -lt 0 -or $ControllerID -gt 1)
         {
             Write-Output "ERROR: CreateHardDrive was passed an invalid IDE Controller ID: $ControllerID"
-            return $False
+            exit -1
         }
     }
 
@@ -185,7 +156,7 @@ function CreateHardDrive( [string] $vmName, [string] $server, [System.Boolean] $
     if ($drive)
     {
         Write-Output "ERROR: drive $controllerType $controllerID $Lun already exists"
-        return $False
+        exit -1
     }
     else
     {
@@ -195,7 +166,7 @@ function CreateHardDrive( [string] $vmName, [string] $server, [System.Boolean] $
         if (-not $hostInfo)
         {
             Write-Output "ERROR: Unable to collect Hyper-V settings for ${server}"
-            return $False
+            exit -1
         }
 
         $defaultVhdPath = $hostInfo.VirtualHardDiskPath
@@ -204,35 +175,42 @@ function CreateHardDrive( [string] $vmName, [string] $server, [System.Boolean] $
             $defaultVhdPath += "\"
         }
 
-    $vhdName = $defaultVhdPath + $vmName + "-" + $controllerType + "-" + $controllerID + "-" + $lun + "-" + $vhdType  + "." + $diskType.ToLower()
+        $vhdName = $defaultVhdPath + $vmName + "-" + $controllerType + "-" + $controllerID + "-" + $lun + "-" + $vhdType  + "." + $diskType.ToLower()
 
-
-        $fileInfo = GetRemoteFileInfo -filename $vhdName -server $server
-
-        if (-not $fileInfo)
+        if(Test-Path $vhdName)
         {
-            $newVhd = $null
-            switch ($vhdType)
-            {
-                "Dynamic"
-                    {
-                        $newvhd = New-VHD -Path $vhdName  -size $global:MinDiskSize -ComputerName $server -Dynamic
-                    }
-                "Fixed"
-                    {
-                        $newVhd = New-VHD -Path $vhdName -size $global:MinDiskSize -ComputerName $server -Fixed
-                    }
-                default
-                    {
-                        Write-Output "Error: unknow vhd type of ${vhdType}"
-                        return $retVal
-                    }
-            }
-            if ($newVhd -eq $null)
-            {
-                write-output "Error: New-VHD failed to create the new .vhd file: $($vhdName)"
-                return $retVal
-            }
+            Remove-Item $vhdName
+        }
+
+        $newVhd = $null
+        if ($diskSize -ne $null -and $diskSize.Length -ne 0)
+        {
+            $intDiskSize = ConvertStringToUInt64 $diskSize
+        }
+        else
+        {
+            $intDiskSize = $global:MinDiskSize
+        }
+        switch ($vhdType)
+        {
+            "Dynamic"
+                {
+                    $newvhd = New-VHD -Path $vhdName  -size $intDiskSize -ComputerName $server -Dynamic -LogicalSectorSize ([int] $sectorSize)
+                }
+            "Fixed"
+                {
+                    $newVhd = New-VHD -Path $vhdName -size $intDiskSize -ComputerName $server -Fixed
+                }
+            default
+                {
+                    Write-Output "Error: unknow vhd type of ${vhdType}"
+                    exit -1
+                }
+        }
+        if ($newVhd -eq $null)
+        {
+            write-output "Error: New-VHD failed to create the new .vhd file: $($vhdName)"
+            exit -1
         }
 
         $ERROR.Clear()
@@ -241,33 +219,16 @@ function CreateHardDrive( [string] $vmName, [string] $server, [System.Boolean] $
         {
             Write-Output "ERROR: Add-VMHardDiskDrive failed to add drive on ${controllerType} ${controllerID} ${Lun}s"
             $ERROR[0].Exception
-            return $retVal
+            exit -1
         }
 
         Write-Output "INFO: Success"
-        $retVal = $True
     }
 
-    return $retVal
 }
 
 # Main entry point for script
 ############################################################################
-
-$retVal = $true
-
-# Check input arguments
-if ($vmName -eq $null -or $vmName.Length -eq 0)
-{
-    Write-Output "ERROR: VM name is null"
-    return $False
-}
-
-if ($hvServer -eq $null -or $hvServer.Length -eq 0)
-{
-    Write-Output "ERROR: hvServer is null"
-    return $False
-}
 
 $SCSI = $false
 if ($controllerType -eq "SCSI")
@@ -278,18 +239,15 @@ if ($controllerType -eq "SCSI")
 if (@("Fixed", "Dynamic", "PassThrough") -notcontains $vhdType)
 {
     Write-Output "ERROR: Unknown disk type: $vhdType"
-    $retVal = $false
-    continue
+    exit -1
 }
 
 Write-Output "CreateHardDrive $vmName $hvServer $diskType $scsi $controllerID $Lun $vhdType $sectorSize"
-$sts = CreateHardDrive -vmName $vmName -server $hvServer -SCSI:$SCSI -ControllerID $controllerID -Lun $Lun -vhdType $vhdType -sectorSize $sectorSize -diskType $diskType
+Write-Output $vhdType
+$sts = CreateHardDrive -vmName $vmName -server $hvServer -SCSI:$SCSI -ControllerID $controllerID -Lun $Lun -vhdType $vhdType -sectorSize $sectorSize -diskType $diskType -diskSize $diskSize
 if (-not $sts[$sts.Length-1])
 {
     write-output "ERROR: Failed to create hard drive"
     $sts
-    $retVal = $false
-    continue
+    exit -1
 }
-
-return $retVal
