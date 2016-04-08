@@ -41,7 +41,7 @@ function GetRemoteFileInfo([String] $filename, [String] $server )
 #
 #######################################################################
 
-$isoFilename = "ISOCheck.txt"
+$isoFilename = "${vmName}.iso"
 
 $error.Clear()
 
