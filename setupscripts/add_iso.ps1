@@ -56,7 +56,7 @@ function GetRemoteFileInfo([String] $filename, [String] $server )
 #
 #######################################################################
 
-$isoFilename = "${vmName}.iso"
+$isoFilename = "testDVD.iso"
 
 $error.Clear()
 
@@ -94,7 +94,7 @@ if (-not ([System.IO.Path]::IsPathRooted($isoFilename)))
         $defaultVhdPath += "\"
     }
 
-    $isoFilename = $defaultVhdPath + $isoFilename
+    $isoFilename = "C:\lis-tempest-ps\tools" + $isoFilename
 
 }
 
@@ -108,7 +108,7 @@ if (-not $isoFileInfo)
 #
 # Insert the .iso file into the VMs DVD drive
 #
-Add-VMDvdDrive -VMName $vmName -Path $isoFilename -ControllerNumber 1 -ControllerLocation 0 -ComputerName $hvServer -Confirm:$False
+Add-VMDvdDrive -VMName $vmName -Path $isoFilename -ControllerNumber 0 -ControllerLocation 1 -ComputerName $hvServer -Confirm:$False
 if ($? -ne "True")
 {
     Write-Output "Error: Unable to mount"
