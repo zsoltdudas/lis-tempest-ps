@@ -94,7 +94,7 @@ if (-not ([System.IO.Path]::IsPathRooted($isoFilename)))
         $defaultVhdPath += "\"
     }
 
-    $isoFilename = "C:\lis-tempest-ps\tools" + $isoFilename
+    $isoFilename = "C:\lis-tempest-ps\tools\" + $isoFilename
 
 }
 
