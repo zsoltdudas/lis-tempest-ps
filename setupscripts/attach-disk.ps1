@@ -12,7 +12,7 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-param([string] $vmName=$(throw “No input”), [string] $hvServer=$(throw “No input”), [string] $controllerType=$(throw “No input”), [int] $controllerId=$(throw “No input”), [int] $lun=$(throw “No input”), [string] $vhdType=$(throw “No input”),[int] $sectorSize=$(throw “No input”), [string] $diskType=$(throw “No input”), [string] $diskSize)
+param([string] $vmName=$(throw "No input"), [string] $hvServer=$(throw "No input"), [string] $controllerType=$(throw "No input"), [int] $controllerId=$(throw "No input"), [int] $lun=$(throw "No input"), [string] $vhdType=$(throw "No input"),[int] $sectorSize=$(throw "No input"), [string] $diskType=$(throw "No input"), [string] $diskSize)
 
 $global:MinDiskSize = 1GB
 $global:DefaultDynamicSize = 127GB

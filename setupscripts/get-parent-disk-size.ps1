@@ -13,7 +13,7 @@
 #    under the License.
 
 
-param([string] $hvServer=$(throw “No input”), [string] $diskName=$(throw “No input”))
+param([string] $hvServer=$(throw "No input"), [string] $diskName=$(throw "No input"))
 
 
 #######################################################################
@@ -31,11 +31,11 @@ param([string] $hvServer=$(throw “No input”), [string] $diskName=$(throw “
 function GetRemoteFileInfo([String] $filename, [String] $server )
 {
     $fileInfo = $null
-    
-    
+
+
     $remoteFilename = $filename.Replace("\", "\\")
     $fileInfo = Get-WmiObject -query "SELECT * FROM CIM_DataFile WHERE Name='${remoteFilename}'" -computer $server
-    
+
     return $fileInfo
 }
 
@@ -65,7 +65,7 @@ if (-not $defaultVhdPath.EndsWith("\"))
 }
 
 
-#$vhdName = $defaultVhdPath + ${vmName} +"-" + ${controllerType} + "-" + ${controllerID}+ "-" + ${lun} + "-" + "Diff.vhd"  
+#$vhdName = $defaultVhdPath + ${vmName} +"-" + ${controllerType} + "-" + ${controllerID}+ "-" + ${lun} + "-" + "Diff.vhd"
 $vhdName = $defaultVhdPath + ${diskName}
 
 #

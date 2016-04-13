@@ -14,7 +14,7 @@
 
 ############################################################################
 
-param([string] $vmName=$(throw “No input”), [string] $hvServer=$(throw “No input”), [string] $diskName=$(throw “No input”))
+param([string] $vmName=$(throw "No input"), [string] $hvServer=$(throw "No input"), [string] $diskName=$(throw "No input"))
 
 ############################################################################
 #

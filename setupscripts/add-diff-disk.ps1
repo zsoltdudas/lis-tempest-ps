@@ -13,7 +13,7 @@
 #    under the License.
 
 
-param([string] $vmName=$(throw “No input”), [string] $hvServer=$(throw “No input”), [string] $controllerType=$(throw “No input”), [int] $controllerId=$(throw “No input”), [int] $lun=$(throw “No input”), [string] $vhdFormat=$(throw “No input”))
+param([string] $vmName=$(throw "No input"), [string] $hvServer=$(throw "No input"), [string] $controllerType=$(throw "No input"), [int] $controllerId=$(throw "No input"), [int] $lun=$(throw "No input"), [string] $vhdFormat=$(throw "No input"))
 
 #######################################################################
 #

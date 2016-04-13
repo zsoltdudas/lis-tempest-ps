@@ -12,7 +12,7 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-param([string] $vmName=$(throw “No input”), [string] $hvServer=$(throw “No input”))
+param([string] $vmName=$(throw "No input"), [string] $hvServer=$(throw "No input"))
 
 
 ############################################################################
