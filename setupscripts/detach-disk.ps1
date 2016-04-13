@@ -31,7 +31,7 @@ if (!$vhdxDisks)
 foreach ($vhdx in $vhdxDisks)
 {
 	$vhdxPath = $vhdx.Path
-	if ($vhdxPath -match $vhdxName)
+	if ($vhdxPath.Contains($vhdxName) -or $vhdxPath.Contains('Target'))
 	{
 		"Info : Removing drive ${vhdxName}"
         $vhdx.ControllerLocation
