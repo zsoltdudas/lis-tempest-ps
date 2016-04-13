@@ -12,7 +12,7 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-param([string] $vmName=$(throw "No input"), [string] $hvServer=$(throw "No input"), [string] $diskName=$(throw "No input"))
+param([string] $vmName=$(throw “No input”), [string] $hvServer=$(throw “No input”), [string] $diskName=$(throw “No input”))
 
 ############################################################################
 #
@@ -31,7 +31,7 @@ if (!$vhdxDisks)
 foreach ($vhdx in $vhdxDisks)
 {
 	$vhdxPath = $vhdx.Path
-	if ($vhdxPath.Contains($vhdxName) -or $vhdxPath.Contains('Target'))
+	if ($vhdxPath -match $vhdxName)
 	{
 		"Info : Removing drive ${vhdxName}"
         $vhdx.ControllerLocation
