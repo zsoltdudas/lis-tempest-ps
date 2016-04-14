@@ -96,6 +96,7 @@ if (-not $Vm)
 {
     Write-Output "Error: Unable to the VM '${VMName}' on the local host"
     exit -1
+}
 
 $Kvp = Get-WmiObject -Namespace root\virtualization\v2 -ComputerName $hvServer -Query "Associators of {$Vm} Where AssocClass=Msvm_SystemDevice ResultClass=Msvm_KvpExchangeComponent"
 if (-not $Kvp)
