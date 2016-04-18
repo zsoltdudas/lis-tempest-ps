@@ -2,6 +2,7 @@
 #
 # Linux on Hyper-V and Azure Test Code, ver. 1.0.0
 # Copyright (c) Microsoft Corporation
+# Copyright 2016 Cloudbase Solutions Srl
 #
 # All rights reserved.
 # Licensed under the Apache License, Version 2.0 (the ""License"");
