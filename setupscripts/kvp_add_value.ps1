@@ -67,6 +67,7 @@ if (-not $VMManagementService)
 {
     Write-Output "Error: Unable to create a VMManagementService object"
     exit -1
+}
 
 $VMGuest = Get-WmiObject -Namespace root\virtualization\v2 -ComputerName $hvServer -Query "Select * From Msvm_ComputerSystem Where ElementName='$VmName'"
 if (-not $VMGuest)
