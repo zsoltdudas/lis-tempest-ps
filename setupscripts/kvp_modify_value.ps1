@@ -2,7 +2,6 @@
 #
 # Linux on Hyper-V and Azure Test Code, ver. 1.0.0
 # Copyright (c) Microsoft Corporation
-# Copyright 2016 Cloudbase Solutions Srl
 #
 # All rights reserved.
 # Licensed under the Apache License, Version 2.0 (the ""License"");
@@ -55,11 +54,10 @@ if (-not $Value)
     exit -1
 }
 
-write-output "Info : Adding Key=value of: ${key}=${value}"
+#
+# Modify the Key Value pair from the Pool 0 on guest OS. If the Key is already not present, will return proper message.
+#
 
-#
-# Add the Key Value pair to the Pool 0 on guest OS.
-#
 $VMManagementService = Get-WmiObject -class "Msvm_VirtualSystemManagementService" -namespace "root\virtualization\v2" -ComputerName $hvServer
 if (-not $VMManagementService)
 {
@@ -82,34 +80,42 @@ if (-not $Msvm_KvpExchangeDataItem)
     exit -1
 }
 
-#
-# Populate the Msvm_KvpExchangeDataItem object
-#
+Write-Output "Info : Modifying Key '${key}'to '${Value}'"
+
 $Msvm_KvpExchangeDataItem.Source = 0
 $Msvm_KvpExchangeDataItem.Name = $Key
 $Msvm_KvpExchangeDataItem.Data = $Value
-
-#
-# Set the KVP value on the guest
-#
-$result = $VMManagementService.AddKvpItems($VMGuest, $Msvm_KvpExchangeDataItem.PSBase.GetText(1))
+$result = $VMManagementService.ModifyKvpItems($VMGuest, $Msvm_KvpExchangeDataItem.PSBase.GetText(1))
 $job = [wmi]$result.Job
 
+#
+# Check if the modify worked
+#
 while($job.jobstate -lt 7) {
     $job.get()
 }
 
 if ($job.ErrorCode -ne 0)
 {
-    Write-Output "Error: Unable to add KVP value to guest"
-    Write-Output "       error code $($job.ErrorCode)"
-    exit -1
+    Write-Output "Error: while modifying the key value pair"
+    Write-Output "Error: Job error code = $($Job.ErrorCode)"
+
+    if ($job.ErrorCode -eq 32773)
+    {
+        Write-Output "Error: Key does not exist.  Key = '${key}'"
+        exit -1
+    }
+    else
+    {
+        Write-Output "Error: Unable to modify key"
+        exit -1
+    }
 }
 
 if ($job.Status -ne "OK")
 {
-    Write-Output "Error: KVP add job did not complete with status OK"
+    Write-Output "Error: KVP modify job did not complete with status OK"
     exit -1
 }
 
-Write-Output "Info : KVP item added successfully on guest"
+Write-Output "Info : KVP item successfully modified"
