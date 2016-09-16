@@ -46,8 +46,8 @@ Try{
     }
     Add-VMNetworkAdapter @cmd_args
     if ($VLAN){
-        Set-VMNetworkAdapterVlan –VMName $VMName `
-        -VMNetworkAdapterName $NICName –Access –VlanId $VLAN
+        Set-VMNetworkAdapterVlan -VMName $VMName `
+        -VMNetworkAdapterName $NICName -Access -VlanId $VLAN
     }
 }
 Catch [system.exception]{
